@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ -z `echo $STY` ] 
+then  
+  echo "Not in screen"
+else 
+  screen -d $STY
+fi

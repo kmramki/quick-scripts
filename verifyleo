@@ -1,0 +1,32 @@
+#!/bin/bash
+
+ROOT=$PWD
+
+while [[ ! -f "${ROOT}/product-spec.json" || -z "`grep '"repo_name": "network-rel"' ${ROOT}/product-spec.json`" ]]
+do
+  ROOT=`dirname $ROOT`
+  if [[ `dirname "$ROOT"` != "$ROOT" ]]
+  then
+    break
+  fi
+done
+
+
+if [[ "$ROOT" == "/" ]]
+then
+  echo 'You are not running this from a netrepo!'
+  exit 1
+fi
+
+if [[ $LEO_HOME != $ROOT ]]
+then
+  echo 'Run qd-set first. Your LEO_HOME is wrong!'
+  exit 1
+fi
+
+if [[ $LEOHOME != $ROOT ]]
+then
+  echo 'Run qd-set first. Your LEOHOME is wrong!'
+  exit 1
+fi
+

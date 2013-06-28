@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [ $# -gt 2 ]
+then
+  dest=$2
+else
+  dest=lib
+fi
+
+
+find $2 -name "*.jar" | while read j
+do
+  count=`jar tf $j | grep $1 | wc -l`
+  if [ $count -ne 0 ]
+  then
+    echo $j
+  fi
+done

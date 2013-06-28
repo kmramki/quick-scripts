@@ -1,0 +1,51 @@
+#!/usr/bin/python
+# -*- coding: iso-8859-15 -*-
+
+import datetime
+import os
+import pwd
+import subprocess
+import tempfile
+
+FOLDER="/home/%s/Documents/Todos/"%pwd.getpwuid(os.getuid())[0]
+
+def get_today_file_path():
+  today=datetime.date.today()
+  filename="todo.%04d%02d%02d"%(today.year,today.month,today.day)
+  filepath=os.path.join(FOLDER, filename)
+  return filepath
+
+def get_last_todo_file():
+  prevfiles=os.listdir(FOLDER)
+  if prevfiles:
+    prevfiles.sort()
+    return prevfiles[-1]
+  return None
+    
+
+def main():
+  filepath = get_today_file_path()
+
+  map_command=':imap <C-\\> <Esc>^ywo<Esc>pA. \\n'
+  last_todo = get_last_todo_file()
+  if last_todo is not None:
+    split_command=':split %s€kd'%os.path.join(FOLDER, last_todo)
+
+  script=tempfile.NamedTemporaryFile()
+  script.write(map_command)
+  if not os.path.exists(filepath):
+    date_string = datetime.date.today().strftime('%A, %B %d, %Y')
+    script_string = ('%siTodo for %s:XiTodo:maoXiNext€kb€kb€kb€kb'
+                     'XiDone:XiActual New:XiObsolete:XiNext Steps:'
+                     '\'aa1. '%(split_command,date_string))
+  else:
+    script_string = ('/\\n*Doneoma:noh\'aA	')
+  
+  script.write(script_string)
+  script.flush()
+  subprocess.call(['/usr/bin/vim', '-s', script.name, filepath])
+
+  script.close()
+
+if __name__ == '__main__':
+  main()
