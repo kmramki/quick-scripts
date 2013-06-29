@@ -6,7 +6,7 @@ import subprocess
 import sys
 from collections import defaultdict
 
-BLACKLISTED_ACLS = set([ 'acl-of-last-resort.acl', 'trunk.acl' ])
+BLACKLISTED_ACLS = set([ 'acl-of-last-resort.acl', 'trunk.acl', 'new-service.acl' ])
 PREFERRED_OWNERS = set([ 'bfalconn', 'jbernard', 'smukherj', 'htam', 'amaeda', 'jmargata', 'cflei', 'cpruett', 'fcao', 'qliu' ])
 
 if len(sys.argv) < 2:
@@ -22,30 +22,43 @@ print '\nChecking for owners for the files:\n%s' % '\n'.join([ '\t%s' % file for
 svin_owners_process = subprocess.Popen([ "svin", "owners" ] + files, stdout=subprocess.PIPE)
 out, err = svin_owners_process.communicate()
 
+#out = open('samplesvinowners.garb', 'r').read()
+#err = None
+
 if err:
   print 'Could not run svin owners: %s' % err
   sys.exit(2)
 
 
 aclLinePattern = re.compile('\s*([^:]*): (.*)')
+filePathLinePattern = re.compile('\s*([^:]*):$')
 svin_owners_lines = out.split('\n')
 
-aclMatches =  [ aclLinePattern.match(i) for i in svin_owners_lines if aclLinePattern.match(i) ]
-aclMatches = [ i for i in aclMatches if i.group(1) not in BLACKLISTED_ACLS ]
-aclsList = [ (i.group(1), set(i.group(2).split(", "))) for i in aclMatches ]
-
-aclsNeededToOwners = dict(aclsList)
-missingAcls = set(aclsNeededToOwners.keys())
-reverseAclsList = [ (owner, acl) for (acl, owners) in aclsList for owner in owners ]
-
-print '\nACLs needed for this checkin: %s' % ','.join(missingAcls)
-
-perfectSetOfCandidates = True
-
+currentFile = None
+aclsNeededToOwners = { }
 ownerToMissingAcls = defaultdict(set)
-for (owner, acl) in reverseAclsList:
-  ownerToMissingAcls[owner].add(acl)
+aclsToFiles = defaultdict(set)
+allFiles = set()
+for i in svin_owners_lines:
+  filePathMatch = filePathLinePattern.match(i)
+  aclMatch = aclLinePattern.match(i)
+  if filePathMatch:
+    currentFile = filePathLinePattern.match(i).group(1)
+    allFiles.add(currentFile)
+  elif aclMatch:
+    acl = aclMatch.group(1)
+    if acl in BLACKLISTED_ACLS:
+      continue
+    owners = aclMatch.group(2).split(", ")
+    aclsNeededToOwners[acl] = owners
+    aclsToFiles[acl].add(currentFile)
+    for owner in owners:
+      ownerToMissingAcls[owner].add(acl)
 
+missingAcls = set(aclsNeededToOwners.keys())
+filesWithMissingAcls = set(allFiles)
+print '\nACLs needed for this checkin: %s' % ','.join(missingAcls)
+perfectSetOfCandidates = True
 candidateOwners = set(sys.argv[2:])
 suggestedOwners = set([])
 for candidateOwner in candidateOwners:
@@ -57,29 +70,34 @@ for candidateOwner in candidateOwners:
     perfectSetOfCandidates = False
   else:
     suggestedOwners.add(candidateOwner)
-    missingAcls -= ownerToMissingAcls[candidateOwner]
+    aclsFromThisOwner = ownerToMissingAcls[candidateOwner]
+    filesApprovedByThisOwner = set([file for acl in aclsFromThisOwner for file in aclsToFiles[acl] ])
+    missingAcls -= aclsFromThisOwner
+    filesWithMissingAcls -= filesApprovedByThisOwner
 
-for preferredOwner in PREFERRED_OWNERS:
-  aclsToGetFromPreferredOwner = ownerToMissingAcls[preferredOwner]
-  if aclsToGetFromPreferredOwner.intersection(missingAcls):
-    suggestedOwners.add(preferredOwner)
-    missingAcls -= aclsToGetFromPreferredOwner
-    if preferredOwner not in suggestedOwners:
-      suggestedOwners.add(preferredOwner)
+for owner in PREFERRED_OWNERS:
+  if owner in candidateOwners:
+    continue
+  aclsFromThisOwner = ownerToMissingAcls[owner]
+  missingAclsFromThisOwner = aclsFromThisOwner.intersection(missingAcls)
+  if missingAclsFromThisOwner:
+    missingAcls -= missingAclsFromThisOwner
+    filesApprovedByThisOwner = set([file for acl in missingAclsFromThisOwner for file in aclsToFiles[acl] ])
+    if filesApprovedByThisOwner.intersection(filesWithMissingAcls):
+      print '\nAdd %s for %s' % (owner, ','.join(aclsFromThisOwner))
+      perfectSetOfCandidates = False
+      suggestedOwners.add(owner)
+    else:
+      print '\nYou may want to add  %s for %s' % (owner, ','.join(aclsFromThisOwner))
 
-for suggestedOwner in suggestedOwners:
-  if suggestedOwner not in candidateOwners:
-    print '\nAdd %s for %s' % (suggestedOwner, ','.join(ownerToMissingAcls(suggestedOwner)))
-    perfectSetOfCandidates = False
 
-print '\nThese owners seem fine: %s' % ','.join(suggestedOwners)
 for missingAcl in missingAcls:
   ownersOfMissingAcl = aclsNeededToOwners[missingAcl]
-  print 'Choose someone for %s: %s' % (missingAcl, ','.join(list(ownersOfMissingAcl)))
-  perfectSetOfCandidates = False
+  if aclsToFiles[missingAcl].intersection(filesWithMissingAcls):
+    print 'Choose someone for %s: %s' % (missingAcl, ','.join(list(ownersOfMissingAcl)))
+    perfectSetOfCandidates = False
+  else:
+    print 'You may want someone for %s: %s' % (missingAcl, ','.join(list(ownersOfMissingAcl)))
 
-
-if perfectSetOfCandidates:
-  print '\n\nThis list of owners is perfect. Go right on!\n'
-
+print '\nI suggest these owners: %s' % ','.join(suggestedOwners)
 
