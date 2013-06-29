@@ -19,10 +19,12 @@ files = [ indexLinePattern.match(i).group(1).strip() for i in f if indexLinePatt
 
 print '\nChecking for owners for the files:\n%s' % '\n'.join([ '\t%s' % file for file in files ])
 
-#svin_owners_process = subprocess.Popen([ "svin", "owners" ] + files, stdout=subprocess.PIPE)
-#out, err = svin_owners_process.communicate()
+svin_owners_process = subprocess.Popen([ "svin", "owners" ] + files, stdout=subprocess.PIPE)
+out, err = svin_owners_process.communicate()
 
-out = open('samplesvinowners.garb', 'r').read()
+if err:
+  print 'Could not run svin owners: %s' % err
+  sys.exit(2)
 
 
 aclLinePattern = re.compile('\s*([^:]*): (.*)')
