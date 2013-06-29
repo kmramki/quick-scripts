@@ -36,22 +36,22 @@ aclsNeededToOwners = dict(aclsList)
 missingAcls = set(aclsNeededToOwners.keys())
 reverseAclsList = [ (owner, acl) for (acl, owners) in aclsList for owner in owners ]
 
+print '\nACLs needed for this checkin: %s' % ','.join(missingAcls)
+
 perfectSetOfCandidates = True
 
 ownerToMissingAcls = defaultdict(set)
 for (owner, acl) in reverseAclsList:
   ownerToMissingAcls[owner].add(acl)
 
-print '\t'
 candidateOwners = set(sys.argv[2:])
 suggestedOwners = set([])
 for candidateOwner in candidateOwners:
-  #print 'Considering %s. Owns %s. Needed for %s' %  (candidateOwner, ownerToMissingAcls[candidateOwner], ownerToMissingAcls[candidateOwner].intersection(missingAcls))
   if not candidateOwner in ownerToMissingAcls:
-    print 'Why is %s included? They seem to not have any ACL needed!' % candidateOwner
+    print '\nWhy is %s included? They seem to not have any ACL needed!' % candidateOwner
     perfectSetOfCandidates = False
   elif not ownerToMissingAcls[candidateOwner].intersection(missingAcls):
-    print 'Looks like %s is not really necessary.' % candidateOwner
+    print '\nLooks like %s is not really necessary.' % candidateOwner
     perfectSetOfCandidates = False
   else:
     suggestedOwners.add(candidateOwner)
@@ -67,9 +67,10 @@ for preferredOwner in PREFERRED_OWNERS:
 
 for suggestedOwner in suggestedOwners:
   if suggestedOwner not in candidateOwners:
-    print 'Add %s for %s' % (suggestedOwner, ','.join(ownerToMissingAcls(suggestedOwner)))
+    print '\nAdd %s for %s' % (suggestedOwner, ','.join(ownerToMissingAcls(suggestedOwner)))
     perfectSetOfCandidates = False
 
+print '\nThese owners seem fine: %s' % ','.join(suggestedOwners)
 for missingAcl in missingAcls:
   ownersOfMissingAcl = aclsNeededToOwners[missingAcl]
   print 'Choose someone for %s: %s' % (missingAcl, ','.join(list(ownersOfMissingAcl)))
