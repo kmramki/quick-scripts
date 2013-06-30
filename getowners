@@ -57,7 +57,7 @@ for i in svin_owners_lines:
 
 missingAcls = set(aclsNeededToOwners.keys())
 filesWithMissingAcls = set(allFiles)
-print '\nACLs needed for this checkin: %s' % ','.join(missingAcls)
+print 'ACLs needed for this checkin: %s\n' % ','.join(missingAcls)
 candidateOwners = set(sys.argv[2:])
 
 minimalSetOfOwners = defaultdict(set)
@@ -85,27 +85,36 @@ for owner in PREFERRED_OWNERS:
     missingAcls -= missingAclsFromThisOwner
     filesApprovedByThisOwner = set([file for acl in missingAclsFromThisOwner for file in aclsToFiles[acl] ])
     if filesApprovedByThisOwner.intersection(filesWithMissingAcls):
-      print '\nAdd %s for %s' % (owner, ','.join(aclsFromThisOwner))
       perfectSetOfCandidates = False
       minimalSetOfOwners[owner] |= aclsFromThisOwner
       filesWithMissingAcls -= filesApprovedByThisOwner
     else:
       additionalOwners[owner] = missingAclsFromThisOwner
 
-if noACLPeople:
-  print '\nWhy are %s included? They seem to not have any ACL needed!' % ','.join(noACLPeople)
-if unnecessaryPeople:
-  print '\nLooks like %s is not really necessary.' %  ','.join(unnecessaryPeople)
-
+necessaryAcls = set()
+aclsWithAllFilesCovered = set()
 for missingAcl in missingAcls:
-  ownersOfMissingAcl = aclsNeededToOwners[missingAcl]
-  if aclsToFiles[missingAcl].intersection(filesWithMissingAcls):
-    print 'Choose someone for %s: %s' % (missingAcl, ','.join(list(ownersOfMissingAcl)))
-    perfectSetOfCandidates = False
-  else:
-    print 'You may want someone for %s: %s' % (missingAcl, ','.join(list(ownersOfMissingAcl)))
+  necessaryAcls = set( [ acl for acl in missingAcls if aclsToFiles[acl].intersection(filesWithMissingAcls) ] )
 
-print '\nI suggest these owners: %s' % ','.join(minimalSetOfOwners)
+aclsWithAllFilesCovered = missingAcls - necessaryAcls
+
+if noACLPeople:
+  print 'Why are %s included? They seem to not have any ACL needed!' % ','.join(noACLPeople)
+if unnecessaryPeople:
+  print 'Looks like %s is not really necessary.' %  ','.join(unnecessaryPeople)
+
+neededAdditionalOwners = dict([ (k, v) for (k, v) in minimalSetOfOwners.items() if k not in candidateOwners ])
+if neededAdditionalOwners:
+  print 'Add %s' % ';'.join([ '%s for %s' % (owner, ','.join(acls)) for (owner, acls) in neededAdditionalOwners.items() ])
+
 if additionalOwners:
-  print 'Additionally, you may want %s' % ';'.join([ '%s for %s' % (owner, ','.join(acls)) for (owner, acls) in additionalOwners.items() ])
+  print 'You may want %s' % ';'.join([ '%s for %s' % (owner, ','.join(acls)) for (owner, acls) in additionalOwners.items() ])
+
+if necessaryAcls:
+  print 'You need someone for %s' % '; '.join([ '%s (%s)' % (acl, ', '.join(aclsNeededToOwners[acl])) for acl in necessaryAcls ])
+
+if aclsWithAllFilesCovered:
+  print 'You may want someone for %s' % '; '.join([ '%s (%s)' % (acl, ', '.join(aclsNeededToOwners[acl])) for acl in aclsWithAllFilesCovered ])
+
+print '\nI suggest these owners, at the very least: %s' % ','.join(minimalSetOfOwners)
 
