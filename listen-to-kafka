@@ -1,0 +1,79 @@
+#!/usr/bin/python
+import argparse
+import json
+import os
+import subprocess
+import sys
+
+config_json = '''{
+    "ei2" : {
+      "zookeeper": {
+      "0.7": "eat1-app397.stg.linkedin.com:12913,eat1-app398.stg.linkedin.com:12913,eat1-app399.stg.linkedin.com:12913/kafka",
+      "0.8": "eat1-app397.stg.linkedin.com:12913,eat1-app398.stg.linkedin.com:12913,eat1-app399.stg.linkedin.com:12913/kafka-cluster"
+      },
+      "schemaRegistry": "http://eat1-app501.stg.linkedin.com:10252/schemaRegistry/schemas"
+    },
+    "ela4" : {
+      "zookeeper": {
+      "0.7": "ela4-app1084.prod:12913,ela4-app1085.prod:12913,ela4-app1088.prod:12913,ela4-app1089.prod:12913,ela4-app1090.prod:12913/kafka",
+      "0.8": "ela4-app2109.prod.linkedin.com:12913,ela4-app2628.prod.linkedin.com:12913,ela4-app2620.prod.linkedin.com:12913,ela4-app2386.prod.linkedin.com:12913,ela4-app2385.prod.linkedin.com:12913/kafka-tracking"
+      },
+      "schemaRegistry": "http://ela4-cst03.prod.linkedin.com:12250/schemaRegistry/schemas"
+    },
+    "prod" : {
+      "zookeeper": {
+      "0.7": "ela4-app1084.prod:12913,ela4-app1085.prod:12913,ela4-app1088.prod:12913,ela4-app1089.prod:12913,ela4-app1090.prod:12913/kafka",
+      "0.8": "ela4-app2109.prod.linkedin.com:12913,ela4-app2628.prod.linkedin.com:12913,ela4-app2620.prod.linkedin.com:12913,ela4-app2386.prod.linkedin.com:12913,ela4-app2385.prod.linkedin.com:12913/kafka-tracking"
+      },
+      "schemaRegistry": "http://ela4-cst03.prod.linkedin.com:12250/schemaRegistry/schemas"
+    },
+    "ei" : {
+      "zookeeper": {
+      "0.7": "eat1-app06.stg.linkedin.com:12913,eat1-app04.stg.linkedin.com:12913,eat1-app05.stg.linkedin.com:12913/kafka",
+      "0.8": "eat1-app06.stg.linkedin.com:12913,eat1-app04.stg.linkedin.com:12913,eat1-app05.stg.linkedin.com:12913/kafka-cluster"
+      },
+      "schemaRegistry": "http://eat1-app110.stg.linkedin.com:10252/schemaRegistry/schemas"
+    },
+    "dev" : {
+      "zookeeper": {
+      "0.7": "127.0.0.1:2121",
+      "0.8": "127.0.0.1:2121/kafka"
+      },
+      "schemaRegistry": "http://localhost:9997/schema-registry/schemas"
+    }
+}'''
+
+config = json.loads(config_json)
+
+parser = argparse.ArgumentParser(description='Listen to Kafka events from some cluster.')
+parser.add_argument('topic', help='What topic to listen to')
+parser.add_argument('--cluster', default='ei2', help='The cluster to listen from:  %s' % ', '.join(config.keys()))
+parser.add_argument('--version', default='0.8', help='The version of Kafka the cluster is using.')
+
+args = parser.parse_args()
+
+if args.cluster not in config:
+  print "Invalid cluster: Must be one of %s" % ", ".join(config.keys())
+  sys.exit(1)
+
+cluster_data = config[args.cluster]
+zookeepers = cluster_data["zookeeper"]
+if args.version not in zookeepers:
+  print 'Invalid version: Must be one of %s' % ', '.join(zookeepers)
+  sys.exit(1)
+
+
+zookeeper = zookeepers[args.version]
+schemaRegistry = cluster_data["schemaRegistry"]
+
+
+kafka_consumer_script='/home/rkmannar/src/kafka-consumer-%s/kafka-console-consumer.sh' % args.version
+
+if not os.path.exists(kafka_consumer_script):
+  print 'Could not find script at %s' % kafka_consumer_script
+  sys.exit(1)
+
+print 'LISTENING TO %s ON %s...' % (args.topic, args.cluster)
+
+subprocess.call([ kafka_consumer_script, '--topic', args.topic, '--zookeeper', zookeeper, '--property', 'schema.registry.url=%s' % schemaRegistry ])
+
